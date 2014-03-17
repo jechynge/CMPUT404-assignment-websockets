@@ -40,7 +40,7 @@ import json
 
 world = dict()
 # set this to something sane 
-calls = 30
+calls = 3000
 
 class WorldClient(WebSocketClient):
     def opened(self):
