@@ -6,7 +6,7 @@
     <meta content='width=device-width; height=device-height; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;' name='viewport' />
     <meta name="viewport" content="width=device-width" />
     <meta name="license" content="
-        Copyright 2013 Google, Abram Hindle
+        Copyright 2013 Google, Abram Hindle, Jordan Ching
         
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
@@ -27,14 +27,24 @@
     <div style="width:100%; height:100px; color:white; font-family:sans-serif; margin:10px;">
         <input type="button" onclick="javascript:sendWorldReset();" value="Reset Canvas" /><br />
         <div style="float:left;">
-            <span style="display:inline-block;width:170px;">Mouse up colour:</span> <input type="color" id="upColour" value="red" /><br />
-            <span style="display:inline-block;width:170px;">Mouse down colour:</span> <input type="color" id="downColour" value="blue" /><br />
-            <span style="display:inline-block;width:170px;">Mouse drag colour:</span> <input type="color" id="dragColour" value="green" /><br />
+            <span style="display:inline-block;width:170px;">Up outline colour:</span> <input type="color" id="upColour" value="red" style="width:100px;" /><br />
+            <span style="display:inline-block;width:170px;">Down outline colour:</span> <input type="color" id="downColour" value="blue" style="width:100px;" /><br />
+            <span style="display:inline-block;width:170px;">Drag outline colour:</span> <input type="color" id="dragColour" value="green" style="width:100px;" /><br />
         </div>
         <div style="float:left;margin-left:10px;">
-            <span style="display:inline-block;width:170px;">Mouse up radius:</span> <input type="spinner" id="upRadius" value="30" /><br />
-            <span style="display:inline-block;width:170px;">Mouse down radius:</span> <input type="spinner" id="downRadius" value="30" /><br />
-            <span style="display:inline-block;width:170px;">Mouse drag radius:</span> <input type="spinner" id="dragRadius" value="10" /><br />
+            <span style="display:inline-block;width:140px;">Up fill colour:</span> <input type="color" id="upFillColour" value="red" style="width:100px;" /><br />
+            <span style="display:inline-block;width:140px;">Down fill colour:</span> <input type="color" id="downFillColour" value="blue" style="width:100px;" /><br />
+            <span style="display:inline-block;width:140px;">Drag fill colour:</span> <input type="color" id="dragFillColour" value="green" style="width:100px;" /><br />
+        </div>
+        <div style="float:left;margin-left:10px;">
+            <span style="display:inline-block;width:120px;">Up radius:</span> <input type="spinner" id="upRadius" value="30" style="width:50px;" /><br />
+            <span style="display:inline-block;width:120px;">Down radius:</span> <input type="spinner" id="downRadius" value="30" style="width:50px;" /><br />
+            <span style="display:inline-block;width:120px;">Drag radius:</span> <input type="spinner" id="dragRadius" value="10" style="width:50px;" /><br />
+        </div>
+        <div style="float:left;margin-left:10px;">
+            <span style="display:inline-block;width:80px;">Up fill:</span> <input type="checkbox" id="upFill" /><br />
+            <span style="display:inline-block;width:80px;">Down fill:</span> <input type="checkbox" id="downFill" /><br />
+            <span style="display:inline-block;width:80px;">Drag fill:</span> <input type="checkbox" id="dragFill" /><br />
         </div>
     </div>
     <div style="width:100%;height:100%;margin:0;padding:0;">
@@ -70,9 +80,12 @@ function drawCircle(context,entity) {
         var x = entity["x"];
         var y = entity["y"];
         //moveTo(x,y);
-        fillStyle = entity["colour"];
-        strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+        fillStyle = entity["fillColour"];
+        strokeStyle = entity["colour"];
+        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);
+        if (entity["fill"]) {
+            fill();
+        }
         stroke();                                
     }
 }
@@ -243,15 +256,15 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntity({'x':x,'y':y,'colour':document.getElementById('upColour').value,'radius':document.getElementById('upRadius').value});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('downColour').value,'radius':document.getElementById('downRadius').value, 'fillColour':document.getElementById('downFillColour').value, 'fill':document.getElementById('downFill').checked});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntity({'x':x,'y':y,'colour':document.getElementById('downColour').value,'radius':document.getElementById('downRadius').value});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('upColour').value,'radius':document.getElementById('upRadius').value, 'fillColour':document.getElementById('upFillColour').value, 'fill':document.getElementById('upFill').checked});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntity({'x':x,'y':y,'colour':document.getElementById('dragColour').value,'radius':document.getElementById('dragRadius').value});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('dragColour').value,'radius':document.getElementById('dragRadius').value, 'fillColour':document.getElementById('dragFillColour').value, 'fill':document.getElementById('dragFill').checked});
 });
 
 

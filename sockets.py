@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-# Copyright (c) 2013-2014 Abram Hindle
+# Copyright (c) 2013-2014 Abram Hindle, Jordan Ching
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -80,6 +80,7 @@ def set_listener( entity, data ):
 
 myWorld.add_set_listener( set_listener )
 
+# Also re-purposed from the in-class examples.
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket'''
     try:
@@ -95,6 +96,7 @@ def read_ws(ws,client):
     except:
         '''Done'''
 
+# Also re-purposed from the in-class examples.
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     client = Client()
