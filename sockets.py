@@ -26,6 +26,17 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+# Shamelessly ripped from the in-class examples. If it ain't broke etc etc.
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
 class World:
     def __init__(self):
         self.clear()
@@ -59,30 +70,46 @@ class World:
     def world(self):
         return self.space
 
-myWorld = World()        
+myWorld = World()
+myClients = list()
 
 def set_listener( entity, data ):
-    ''' do something with the update ! '''
+    msg = json.dumps({entity:data})
+    for client in myClients:
+        client.put(msg)
 
 myWorld.add_set_listener( set_listener )
-        
-@app.route('/')
-def hello():
-    '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
 
 def read_ws(ws,client):
-    '''A greenlet function that reads from the websocket and updates the world'''
-    # XXX: TODO IMPLEMENT ME
-    return None
+    '''A greenlet function that reads from the websocket'''
+    try:
+        while True:
+            msg = ws.receive()
+            if (msg is not None):
+                if(msg != "null"):
+                    entities = json.loads(msg)
+                    for i in entities:
+                        myWorld.set(i, entities[i])
+            else:
+                break
+    except:
+        '''Done'''
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
-    '''Fufill the websocket URL of /subscribe, every update notify the
-       websocket and read updates from the websocket '''
-    # XXX: TODO IMPLEMENT ME
-    return None
-
+    client = Client()
+    myClients.append(client)
+    g = gevent.spawn( read_ws, ws, client )
+    try:
+        client.put(json.dumps(myWorld.world()))
+        while True:
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:# WebSocketError as e:
+        print "WS Error %s" % e
+    finally:
+        myClients.remove(client)
+        gevent.kill(g)
 
 def flask_post_json():
     '''Ah the joys of frameworks! They do so much work for you
@@ -94,26 +121,52 @@ def flask_post_json():
     else:
         return json.loads(request.form.keys()[0])
 
+@app.route("/")
+def hello():
+    return flask.redirect('/static/index.html')
+
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
-    '''update the entities via this interface'''
-    return None
+    updateEntity = flask_post_json()
+    for key in updateEntity:
+        myWorld.update(entity, key, updateEntity[key])
+    
+    return flask.jsonify(myWorld.get(entity))
 
-@app.route("/world", methods=['POST','GET'])    
+@app.route("/world", methods=['POST','GET'])
 def world():
-    '''you should probably return the world here'''
-    return None
+    if(request.method == 'POST'):
+        entities = flask_post_json()
+        for i in entities:
+            myWorld.set(str(random.randint(1,1000000)), entities[i])
+    
+    return flask.jsonify(myWorld.world())
+
+@app.route("/seeTheWorld", methods=['GET'])
+def seeTheWorld():
+    html = "<!DOCTYPE html><head><title>World Representation</title></head><body>"
+    html += "<h1>World Representation</h1>"
+    html += "<table><thead><th>Name</th><th>X</th><th>Y</th><th>Colour</th></thead>"
+    html += "<tbody>"
+    entities = myWorld.world()
+    for entity in entities:
+        myEntity = entities[entity]
+        html += "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (entity, myEntity["x"], myEntity["y"], myEntity["colour"])
+    
+    html += "</tbody></table></body></html>"
+    
+    return html
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
-    '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
-
+    return flask.jsonify(myWorld.get(entity))
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
-    '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    for client in myClients:
+        client.put(json.dumps({'SRVRCTRL':'CLEAR'}))
+    return "World cleared."
 
 
 

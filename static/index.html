@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html> 
-  <head> 
+<head> 
     <title>Websockets Assignment</title> 
     <meta charset="utf-8" /> 
     <meta content='width=device-width; height=device-height; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;' name='viewport' />
@@ -21,11 +21,25 @@
         limitations under the License.
     "/>
     <script src="json2.js"></script>
-  </head> 
-  <body bgcolor="white" height="100%" width="100%"> 
-    <div id="debug"></div>
-    <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
-
+</head> 
+<body bgcolor="black" height="100%" width="100%" style="padding:0;margin:0;">
+    <div id="debug" style="color:white;"></div>
+    <div style="width:100%; height:100px; color:white; font-family:sans-serif; margin:10px;">
+        <input type="button" onclick="javascript:sendWorldReset();" value="Reset Canvas" /><br />
+        <div style="float:left;">
+            <span style="display:inline-block;width:170px;">Mouse up colour:</span> <input type="color" id="upColour" value="red" /><br />
+            <span style="display:inline-block;width:170px;">Mouse down colour:</span> <input type="color" id="downColour" value="blue" /><br />
+            <span style="display:inline-block;width:170px;">Mouse drag colour:</span> <input type="color" id="dragColour" value="green" /><br />
+        </div>
+        <div style="float:left;margin-left:10px;">
+            <span style="display:inline-block;width:170px;">Mouse up radius:</span> <input type="spinner" id="upRadius" value="30" /><br />
+            <span style="display:inline-block;width:170px;">Mouse down radius:</span> <input type="spinner" id="downRadius" value="30" /><br />
+            <span style="display:inline-block;width:170px;">Mouse drag radius:</span> <input type="spinner" id="dragRadius" value="10" /><br />
+        </div>
+    </div>
+    <div style="width:100%;height:100%;margin:0;padding:0;">
+        <canvas id="c" style="-moz-box-sizing:border-box;box-sizing:border-box;-webkit-tap-highlight-color: transparent;border:2px solid white;width:100%;height:100%;"></canvas> 
+    </div>
     <script>
       // Fix me
 var canvas = document.getElementById('c');
@@ -33,6 +47,9 @@ var host = window.location.host;
 var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
+var clientId = Math.floor((Math.random()*1000000)+1);
+var clientName = "Anon"+clientId;
+var counter = 0;
 var wscounter = 0;
 var socket;
 
@@ -43,6 +60,7 @@ function debug(str) {
 debug("Test");
 
 world = {};
+newObjects = {};
 
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
@@ -121,15 +139,9 @@ function getPosition(e) {
 	}
 }
 
-function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just modified!
-}
-var counter = 0;
-function addEntityWithoutName(data) {
-    var name = "X"+(counter++)%100;
-    addEntity(name,data);
+function addEntity(entity) {
+    var eId = counter++ %100;
+    newObjects[clientId.toString()+eId.toString()] = entity;
 }
 
 // canvas + mouse/touch is complicated 
@@ -231,29 +243,40 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('upColour').value,'radius':document.getElementById('upRadius').value});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('downColour').value,'radius':document.getElementById('downRadius').value});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntity({'x':x,'y':y,'colour':document.getElementById('dragColour').value,'radius':document.getElementById('dragRadius').value});
 });
 
 
 function update() {
-    drawFrame();
+    if (Object.keys(newObjects).length > 0) {
+        socket.send(JSON.stringify(newObjects));
+        newObjects = {};
+    }
 }
+
+function parseResponse(entities) {
+    for (var entity in entities) {
+        world[entity] = entities[entity];
+    }
+    
+    renderFrame();
+}
+
 
 
 function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
     socket.onopen = function() {
-        //XXX: TODO What are you going to do here?
+        socket.send(null)
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,21 +284,62 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            response = JSON.parse(msg.data);
+            if (Object.keys(response).length == 1 && 'SRVRCTRL' in response) {
+                handleServerMessage(response['SRVRCTRL']);
+            }
+            else {
+                parseResponse(response);
+            }
         } catch (e) {
             alert("socket on message: " + e);
         }
     }; 
 }
 
+function handleServerMessage(message) {
+    switch (message) {
+        case 'CLEAR':
+            resetCanvas();
+            break;
+        default:
+            break;
+    }
+}
+
 wsSetup();
-
-
-
 
 // 30 frames per second
 setInterval( update, 1000/30.0);
 
+function resetCanvas() {
+    world = {};
+    renderFrame();
+}
+
+function sendWorldReset() {
+  sendJSONXMLHTTPRequest("http://"+host+"/clear");
+}
+
+function sendJSONXMLHTTPRequest(url, objects, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState==4) {
+            try {
+                if (xhr.status==200) {
+		  console.log(":)");
+                }
+            } 
+            catch(e) {
+                alert('Error: ' + e.name);
+            }
+        }
+    };
+    
+    method = "GET";
+    xhr.open(method,url,true);
+    xhr.send("");
+}
 
     </script>
 </body>
